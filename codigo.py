@@ -9,6 +9,7 @@ archivo = st.file_uploader("Cargá el archivo Excel", type=["xlsx", "xls"])
 
 def crear_grafico_linea(df_plot, fondos_config):
     fig = go.Figure()
+    
 
     for fondo in df_plot["fondos"].unique():
         datos = df_plot[df_plot["fondos"] == fondo]
@@ -28,6 +29,8 @@ def crear_grafico_linea(df_plot, fondos_config):
             )
         )
 
+    fechas_unicas = df_plot["fecha"].sort_values().dt.strftime("%Y-%m-%d").unique()
+
     fig.update_layout(
         title="Evolución de fondos",
         template="simple_white",
@@ -35,8 +38,8 @@ def crear_grafico_linea(df_plot, fondos_config):
         yaxis_title="Diferencia vs base (ajustada)",
         xaxis=dict(
             type="date",
-            tickformat="%d-%m",
-            dtick="D1"
+            tickvals=fechas_unicas,
+            ticktext=[pd.to_datetime(f).strftime("%d-%m") for f in fechas_unicas]
         )
     )
 
