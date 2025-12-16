@@ -126,6 +126,70 @@ def crear_grafico_barra_por_eje(
 
     return fig
 
+def crear_grafico_torta(df_plot, titulo, mostrar_value):
+    """
+    Reglas:
+    - 1 grupo + varias fechas  -> torta temporal del grupo
+    - 1 fecha + varios grupos  -> torta por grupos
+    - otro caso                -> warning
+    """
+
+    grupos = df_plot[COLUMNA_AGRUPADORA].unique()
+    fechas = df_plot["fecha"].unique()
+
+    cant_grupos = len(grupos)
+    cant_fechas = len(fechas)
+
+    # ----- Caso 1: UN grupo, VARIAS fechas -----
+    if cant_grupos == 1 and cant_fechas > 1:
+        df_ord = df_plot.sort_values("fecha")
+
+        fig = go.Figure(
+            data=[
+                go.Pie(
+                    labels=df_ord["fecha"].dt.strftime("%d-%m"),
+                    values=df_ord["valor"],
+                    textinfo="percent+label" + ("+value" if mostrar_valores=="Sí" else "")
+                )
+            ]
+        )
+
+        fig.update_layout(
+            title=f"{titulo} – {grupos[0]}", # Aca se agrega el grupo agrupador ya sea grupo o fecha
+            template="simple_white"
+        )
+
+        return fig
+
+    # ----- Caso 2: UNA fecha, VARIOS grupos -----
+    elif cant_fechas == 1 and cant_grupos > 1:
+        fig = go.Figure(
+            data=[
+                go.Pie(
+                    labels=df_plot[COLUMNA_AGRUPADORA],
+                    values=df_plot["valor"],
+                    textinfo="percent+label"
+                )
+            ]
+        )
+
+        fig.update_layout(
+            title=f"{titulo} – {pd.to_datetime(fechas[0]).strftime('%d-%m')}",
+            template="simple_white"
+        )
+
+        return fig
+
+    # ----- Casos inválidos -----
+    else:
+        st.warning(
+            "⚠️ El gráfico de torta requiere una de las 2 situaciones:\n"
+            "- una sola fecha y varios grupos\n"
+            "- un solo grupo y varias fechas."
+        )
+        return None
+
+
 if archivo is not None:
     # Leer excel
     df = pd.read_excel(archivo)
@@ -151,13 +215,23 @@ if archivo is not None:
 
     # Formulario
     with st.form("form_filtros"):
-        st.subheader("Filtros")
-
-        # Rango de fechas
-        fecha_inicio, fecha_fin = st.date_input(
-            "Seleccioná el rango de fechas",
-            value=(fechas.min(), fechas.max())
+        
+        st.markdown("## Tipo de grafico")
+        
+        # 👇 RADIO BUTTON
+        tipo_grafico = st.radio(
+            "Tipo de gráfico",
+            [
+                "Líneas",
+                "Barras",
+                "Barras (X = grupos)",
+                "Torta"
+            ]
         )
+        
+        st.markdown("## Configuracion")
+        
+        st.markdown("### Titulos")
         
         # Títulos personalizados
         titulo_grafico = st.text_input("Título del gráfico", value="Evolución de fondos")
@@ -170,16 +244,14 @@ if archivo is not None:
             ["No", "Sí"]
         )
         
-        # 👇 RADIO BUTTON
-        tipo_grafico = st.radio(
-            "Tipo de gráfico",
-            [
-                "Líneas",
-                "Barras (X = grupos)",
-                "Barras"
-            ]
-        )
+        st.markdown("## Filtros")
 
+        # Rango de fechas
+        fecha_inicio, fecha_fin = st.date_input(
+            "Seleccioná el rango de fechas",
+            value=(fechas.min(), fechas.max())
+        )
+        
         st.markdown("### Grupos y divisores")
 
         fondos_config = {}
@@ -203,7 +275,7 @@ if archivo is not None:
                 "incluir": incluir,
                 "divisor": divisor
             }
-
+        
         boton = st.form_submit_button("Crear gráfico")
 
     # Crear gráfico
@@ -246,15 +318,18 @@ if archivo is not None:
                     df_plot, fondos_config, mostrar_valores,
                     titulo_grafico, titulo_x, titulo_y
                 )
-
+                
+            elif tipo_grafico == "Torta":
+                fig = crear_grafico_torta(df_plot, titulo_grafico, mostrar_valores)
+                
             else:  # Barras
                 fig = crear_grafico_barra_por_eje(
                     df_plot, fondos_config, mostrar_valores,
                     titulo_grafico, titulo_x, titulo_y
                 )
                 
-            st.session_state["fig"] = fig
-            st.plotly_chart(fig, use_container_width=True)
+            if fig is not None:
+                st.plotly_chart(fig, use_container_width=True)
 
         else:
             st.warning("No seleccionaste ningún fondo.")

@@ -1,0 +1,14 @@
+Los siguientes ejemplo de uso son en base a la tabla en example.xlsx
+
+Grafico de lineas:
+Si uno quisiera ver la evolucion de los fondos en el tiempo, este es la mejor opcion.
+
+Grafico de barras (X=Grupo):
+En este caso el eje X ya no serian las fechas, si no los grupos, y las barras serian las fechas, util para una comparacion entre grupos, por ejemplo ver en un mismo grupo mas claramente como evoluciona el fondo en cada fecha.
+
+Grafico de barras:
+El tipico grafico con las fechas en el eje X, muestra en otro formato el valor de cada fondo en cada fecha, util si queres ver principlamente la diferencia entre cada fondo ene vez de ver la evolucion del fondo en si mismo.
+
+Grafico de Torta:
+En este caso el grafico solo sirve si se selecciona un unico fondo en diversas fechas (te mostraria el porcentaje que representa esa fecha en el total de las fechas elegidas) o si se seleccionan varios fondos en una sola fecha (En ese caso podras ver cuanto representa cada fondo en esa fecha).
+En este caso unos ejemplos mas claros serian una tabla con productos y en cada fecha la cantidad vendida, asi sabrias por ejemplo que producto se vendio mas un dia especifico o que dia se vendio mas un producto especifico
