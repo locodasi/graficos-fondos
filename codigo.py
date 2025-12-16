@@ -7,7 +7,7 @@ st.title("Evolución de fondos (diferencia vs base)")
 
 archivo = st.file_uploader("Cargá el archivo Excel", type=["xlsx", "xls"])
 
-def crear_grafico_linea(df_plot, fondos_config):
+def crear_grafico_linea(df_plot, fondos_config, mostrar_valores, titulo, titulo_x, titulo_y):
     fig = go.Figure()
     
 
@@ -24,18 +24,20 @@ def crear_grafico_linea(df_plot, fondos_config):
             go.Scatter(
                 x=datos["fecha"],
                 y=datos["valor"],
-                mode="lines+markers",
-                name=label
+                mode="lines+markers+text" if mostrar_valores=="Sí" else "lines+markers",
+                name=label,
+                text=datos["valor"].round(2) if mostrar_valores=="Sí" else None,
+                textposition="top center"
             )
         )
 
     fechas_unicas = df_plot["fecha"].sort_values().dt.strftime("%Y-%m-%d").unique()
 
     fig.update_layout(
-        title="Evolución de fondos",
+        title=titulo,
         template="simple_white",
-        xaxis_title="Fecha",
-        yaxis_title="Diferencia vs base (ajustada)",
+        xaxis_title=titulo_x,
+        yaxis_title=titulo_y,
         xaxis=dict(
             type="date",
             tickvals=fechas_unicas,
@@ -45,7 +47,7 @@ def crear_grafico_linea(df_plot, fondos_config):
 
     return fig
 
-def crear_grafico_barra(df_plot, fondos_config):
+def crear_grafico_barra(df_plot, fondos_config, mostrar_valores, titulo, titulo_x, titulo_y):
     fig = go.Figure()
 
     # Fechas únicas ordenadas
@@ -63,21 +65,23 @@ def crear_grafico_barra(df_plot, fondos_config):
     # Crear una traza POR FECHA
     for fecha in fechas:
         datos_fecha = df_plot[df_plot["fecha"] == fecha]
-
+        y_vals = datos_fecha["valor"]
         fig.add_trace(
             go.Bar(
-                x=fondos_labels,               # 👈 eje X = fondos
-                y=datos_fecha["valor"],        # valores
-                name=pd.to_datetime(fecha).strftime("%d-%m")  # color = fecha
+                x=fondos_labels,
+                y=y_vals,
+                name=pd.to_datetime(fecha).strftime("%d-%m"),
+                text=y_vals.round(2) if mostrar_valores=="Sí" else None,
+                textposition="auto"
             )
         )
 
     fig.update_layout(
-        title="Comparación de fondos por fecha",
+        title=titulo,
         template="simple_white",
-        xaxis_title="Fondos",
-        yaxis_title="Diferencia vs base (ajustada)",
-        barmode="group"   # 👈 barras lado a lado
+        xaxis_title=titulo_x,
+        yaxis_title=titulo_y,
+        barmode="group"
     )
 
     return fig
@@ -109,6 +113,17 @@ if archivo is not None:
         fecha_inicio, fecha_fin = st.date_input(
             "Seleccioná el rango de fechas",
             value=(fechas.min(), fechas.max())
+        )
+        
+        # Títulos personalizados
+        titulo_grafico = st.text_input("Título del gráfico", value="Evolución de fondos")
+        titulo_x = st.text_input("Título eje X", value="Fecha")
+        titulo_y = st.text_input("Título eje Y", value="Diferencia (ajustada)")
+        
+        # Mostrar valores
+        mostrar_valores = st.radio(
+            "Mostrar valores en el gráfico?",
+            ["No", "Sí"]
         )
         
         # 👇 RADIO BUTTON
@@ -173,9 +188,9 @@ if archivo is not None:
 
             # 👇 ACA SE ELIGE QUÉ FUNCIÓN USAR
             if tipo_grafico == "Líneas":
-                fig = crear_grafico_linea(df_plot, fondos_config)
+                fig = crear_grafico_linea(df_plot, fondos_config, mostrar_valores, titulo_grafico, titulo_x, titulo_y)
             else:
-                fig = crear_grafico_barra(df_plot, fondos_config)
+                fig = crear_grafico_barra(df_plot, fondos_config, mostrar_valores, titulo_grafico, titulo_x, titulo_y)
                 
             st.session_state["fig"] = fig
             st.plotly_chart(fig, use_container_width=True)
