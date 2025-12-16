@@ -95,15 +95,11 @@ if archivo is not None:
         .str.lower()
     )
 
-    columnas_fijas = ["fondos", "base"]
+    columnas_fijas = ["fondos"]
     columnas_fechas = [c for c in df.columns if c not in columnas_fijas]
 
     # Convertir fechas
     fechas = pd.to_datetime(columnas_fechas)
-
-    # Restar base
-    for col in columnas_fechas:
-        df[col] = df[col] - df["base"]
 
     # Formulario
     with st.form("form_filtros"):
