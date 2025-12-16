@@ -47,7 +47,7 @@ def crear_grafico_linea(df_plot, fondos_config, mostrar_valores, titulo, titulo_
 
     return fig
 
-def crear_grafico_barra(df_plot, fondos_config, mostrar_valores, titulo, titulo_x, titulo_y):
+def crear_grafico_barra_por_grupo(df_plot, fondos_config, mostrar_valores, titulo, titulo_x, titulo_y):
     fig = go.Figure()
 
     # Fechas únicas ordenadas
@@ -86,6 +86,45 @@ def crear_grafico_barra(df_plot, fondos_config, mostrar_valores, titulo, titulo_
 
     return fig
 
+def crear_grafico_barra_por_eje(
+    df_plot, fondos_config, mostrar_valores, titulo, titulo_x, titulo_y
+):
+    fig = go.Figure()
+
+    fechas_unicas = df_plot["fecha"].sort_values().dt.strftime("%Y-%m-%d").unique()
+
+    for fondo in df_plot[COLUMNA_AGRUPADORA].unique():
+        datos_fondo = df_plot[df_plot[COLUMNA_AGRUPADORA] == fondo]
+
+        divisor = fondos_config[fondo]["divisor"]
+        label = fondo if divisor == 1 else f"{fondo} (÷ {divisor})"
+
+        y_vals = datos_fondo.sort_values("fecha")["valor"]
+
+        fig.add_trace(
+            go.Bar(
+                x=fechas_unicas,
+                y=y_vals,
+                name=label,
+                text=y_vals.round(2) if mostrar_valores == "Sí" else None,
+                textposition="auto"
+            )
+        )
+
+    fig.update_layout(
+        title=titulo,
+        template="simple_white",
+        xaxis_title=titulo_x,
+        yaxis_title=titulo_y,
+        barmode="group",
+        xaxis=dict(
+            type="date",
+            tickvals=fechas_unicas,
+            ticktext=[pd.to_datetime(f).strftime("%d-%m") for f in fechas_unicas]
+        )
+    )
+
+    return fig
 
 if archivo is not None:
     # Leer excel
@@ -134,7 +173,11 @@ if archivo is not None:
         # 👇 RADIO BUTTON
         tipo_grafico = st.radio(
             "Tipo de gráfico",
-            ["Líneas", "Barras"]
+            [
+                "Líneas",
+                "Barras (X = grupos)",
+                "Barras"
+            ]
         )
 
         st.markdown("### Grupos y divisores")
@@ -193,9 +236,22 @@ if archivo is not None:
 
             # 👇 ACA SE ELIGE QUÉ FUNCIÓN USAR
             if tipo_grafico == "Líneas":
-                fig = crear_grafico_linea(df_plot, fondos_config, mostrar_valores, titulo_grafico, titulo_x, titulo_y)
-            else:
-                fig = crear_grafico_barra(df_plot, fondos_config, mostrar_valores, titulo_grafico, titulo_x, titulo_y)
+                fig = crear_grafico_linea(
+                    df_plot, fondos_config, mostrar_valores,
+                    titulo_grafico, titulo_x, titulo_y
+                )
+
+            elif tipo_grafico == "Barras (X = grupos)":
+                fig = crear_grafico_barra_por_grupo(
+                    df_plot, fondos_config, mostrar_valores,
+                    titulo_grafico, titulo_x, titulo_y
+                )
+
+            else:  # Barras
+                fig = crear_grafico_barra_por_eje(
+                    df_plot, fondos_config, mostrar_valores,
+                    titulo_grafico, titulo_x, titulo_y
+                )
                 
             st.session_state["fig"] = fig
             st.plotly_chart(fig, use_container_width=True)
