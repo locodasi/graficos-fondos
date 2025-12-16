@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-
-st.title("Evolución de fondos (diferencia vs base)")
+COLUMNA_AGRUPADORA = "columna_agrupadora_xxxjhtrs"
+st.title("Creador de graficos")
 
 archivo = st.file_uploader("Cargá el archivo Excel", type=["xlsx", "xls"])
 
@@ -11,8 +11,8 @@ def crear_grafico_linea(df_plot, fondos_config, mostrar_valores, titulo, titulo_
     fig = go.Figure()
     
 
-    for fondo in df_plot["fondos"].unique():
-        datos = df_plot[df_plot["fondos"] == fondo]
+    for fondo in df_plot[COLUMNA_AGRUPADORA].unique():
+        datos = df_plot[df_plot[COLUMNA_AGRUPADORA] == fondo]
         divisor = fondos_config[fondo]["divisor"]
 
         if divisor == 1:
@@ -55,7 +55,7 @@ def crear_grafico_barra(df_plot, fondos_config, mostrar_valores, titulo, titulo_
 
     # Fondos (eje X) con divisor en el nombre si corresponde
     fondos_labels = []
-    for fondo in df_plot["fondos"].unique():
+    for fondo in df_plot[COLUMNA_AGRUPADORA].unique():
         divisor = fondos_config[fondo]["divisor"]
         if divisor == 1:
             fondos_labels.append(fondo)
@@ -99,8 +99,13 @@ if archivo is not None:
         .str.lower()
     )
 
-    columnas_fijas = ["fondos"]
-    columnas_fechas = [c for c in df.columns if c not in columnas_fijas]
+    # Detectar la primera columna del Excel
+    primera_columna = df.columns[0]
+
+    # Renombrar la primera columna con la constante
+    df = df.rename(columns={primera_columna: COLUMNA_AGRUPADORA})
+    
+    columnas_fechas = [c for c in df.columns if c not in COLUMNA_AGRUPADORA]
 
     # Convertir fechas
     fechas = pd.to_datetime(columnas_fechas)
@@ -118,7 +123,7 @@ if archivo is not None:
         # Títulos personalizados
         titulo_grafico = st.text_input("Título del gráfico", value="Evolución de fondos")
         titulo_x = st.text_input("Título eje X", value="Fecha")
-        titulo_y = st.text_input("Título eje Y", value="Diferencia (ajustada)")
+        titulo_y = st.text_input("Título eje Y", value="Valor")
         
         # Mostrar valores
         mostrar_valores = st.radio(
@@ -132,11 +137,11 @@ if archivo is not None:
             ["Líneas", "Barras"]
         )
 
-        st.markdown("### Fondos y divisores")
+        st.markdown("### Grupos y divisores")
 
         fondos_config = {}
 
-        for fondo in df["fondos"].unique():
+        for fondo in df[COLUMNA_AGRUPADORA].unique():
             col1, col2, col3 = st.columns([2, 2, 2])
 
             with col1:
@@ -166,7 +171,7 @@ if archivo is not None:
         ]
 
         df_largo = df.melt(
-            id_vars="fondos",
+            id_vars=COLUMNA_AGRUPADORA,
             value_vars=fechas_filtradas,
             var_name="fecha",
             value_name="valor"
@@ -179,7 +184,7 @@ if archivo is not None:
 
         for fondo, cfg in fondos_config.items():
             if cfg["incluir"]:
-                temp = df_largo[df_largo["fondos"] == fondo].copy()
+                temp = df_largo[df_largo[COLUMNA_AGRUPADORA] == fondo].copy()
                 temp["valor"] = temp["valor"] / cfg["divisor"]
                 filas.append(temp)
 
