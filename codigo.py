@@ -3,35 +3,54 @@ import pandas as pd
 import plotly.graph_objects as go
 
 COLUMNA_AGRUPADORA = "columna_agrupadora_xxxjhtrs"
+
+GRAF_LINEAS = "Líneas"
+GRAF_BARRAS_EJE = "Barras"
+GRAF_BARRAS_GRUPO = "Barras (X = grupos)"
+GRAF_TORTA = "Torta"
+
+SI = "Sí"
+NO = "No"
+
+def etiqueta_fondo(fondo, divisor):
+    return fondo if divisor == 1 else f"{fondo} (÷ {divisor})"
+
+def fechas_unicas_ordenadas(df):
+    return (
+        df["fecha"]
+        .sort_values()
+        .dt.strftime("%Y-%m-%d")
+        .unique()
+    )
+
+
+
 st.title("Creador de graficos")
 
 archivo = st.file_uploader("Cargá el archivo Excel", type=["xlsx", "xls"])
 
-def crear_grafico_linea(df_plot, fondos_config, mostrar_valores, titulo, titulo_x, titulo_y):
+def crear_grafico_linea(df_plot, fondos_config, mostrar_valores, titulo, titulo_x, titulo_y, **kwargs):
     fig = go.Figure()
     
 
     for fondo in df_plot[COLUMNA_AGRUPADORA].unique():
         datos = df_plot[df_plot[COLUMNA_AGRUPADORA] == fondo]
-        divisor = fondos_config[fondo]["divisor"]
 
-        if divisor == 1:
-            label = fondo
-        else:
-            label = f"{fondo} (÷ {divisor})"
+        label = etiqueta_fondo(fondo, fondos_config[fondo]["divisor"])
+
 
         fig.add_trace(
             go.Scatter(
                 x=datos["fecha"],
                 y=datos["valor"],
-                mode="lines+markers+text" if mostrar_valores=="Sí" else "lines+markers",
+                mode="lines+markers+text" if mostrar_valores==SI else "lines+markers",
                 name=label,
-                text=datos["valor"].round(2) if mostrar_valores=="Sí" else None,
+                text=datos["valor"].round(2) if mostrar_valores==SI else None,
                 textposition="top center"
             )
         )
 
-    fechas_unicas = df_plot["fecha"].sort_values().dt.strftime("%Y-%m-%d").unique()
+    fechas_unicas = fechas_unicas_ordenadas(df_plot)
 
     fig.update_layout(
         title=titulo,
@@ -47,7 +66,7 @@ def crear_grafico_linea(df_plot, fondos_config, mostrar_valores, titulo, titulo_
 
     return fig
 
-def crear_grafico_barra_por_grupo(df_plot, fondos_config, mostrar_valores, titulo, titulo_x, titulo_y):
+def crear_grafico_barra_por_grupo(df_plot, fondos_config, mostrar_valores, titulo, titulo_x, titulo_y, **kwargs):
     fig = go.Figure()
 
     # Fechas únicas ordenadas
@@ -56,12 +75,9 @@ def crear_grafico_barra_por_grupo(df_plot, fondos_config, mostrar_valores, titul
     # Fondos (eje X) con divisor en el nombre si corresponde
     fondos_labels = []
     for fondo in df_plot[COLUMNA_AGRUPADORA].unique():
-        divisor = fondos_config[fondo]["divisor"]
-        if divisor == 1:
-            fondos_labels.append(fondo)
-        else:
-            fondos_labels.append(f"{fondo} (÷ {divisor})")
-
+        label = etiqueta_fondo(fondo, fondos_config[fondo]["divisor"])
+        fondos_labels.append(label)
+        
     # Crear una traza POR FECHA
     for fecha in fechas:
         datos_fecha = df_plot[df_plot["fecha"] == fecha]
@@ -71,7 +87,7 @@ def crear_grafico_barra_por_grupo(df_plot, fondos_config, mostrar_valores, titul
                 x=fondos_labels,
                 y=y_vals,
                 name=pd.to_datetime(fecha).strftime("%d-%m"),
-                text=y_vals.round(2) if mostrar_valores=="Sí" else None,
+                text=y_vals.round(2) if mostrar_valores==SI else None,
                 textposition="auto"
             )
         )
@@ -86,18 +102,16 @@ def crear_grafico_barra_por_grupo(df_plot, fondos_config, mostrar_valores, titul
 
     return fig
 
-def crear_grafico_barra_por_eje(
-    df_plot, fondos_config, mostrar_valores, titulo, titulo_x, titulo_y
-):
+def crear_grafico_barra_por_eje( df_plot, fondos_config, mostrar_valores, titulo, titulo_x, titulo_y, **kwargs ):
     fig = go.Figure()
 
-    fechas_unicas = df_plot["fecha"].sort_values().dt.strftime("%Y-%m-%d").unique()
+    fechas_unicas = fechas_unicas_ordenadas(df_plot)
 
     for fondo in df_plot[COLUMNA_AGRUPADORA].unique():
         datos_fondo = df_plot[df_plot[COLUMNA_AGRUPADORA] == fondo]
 
-        divisor = fondos_config[fondo]["divisor"]
-        label = fondo if divisor == 1 else f"{fondo} (÷ {divisor})"
+        label = etiqueta_fondo(fondo, fondos_config[fondo]["divisor"])
+
 
         y_vals = datos_fondo.sort_values("fecha")["valor"]
 
@@ -106,7 +120,7 @@ def crear_grafico_barra_por_eje(
                 x=fechas_unicas,
                 y=y_vals,
                 name=label,
-                text=y_vals.round(2) if mostrar_valores == "Sí" else None,
+                text=y_vals.round(2) if mostrar_valores == SI else None,
                 textposition="auto"
             )
         )
@@ -126,7 +140,7 @@ def crear_grafico_barra_por_eje(
 
     return fig
 
-def crear_grafico_torta(df_plot, titulo, mostrar_value):
+def crear_grafico_torta(df_plot, titulo, mostrar_valores, **kwargs):
     """
     Reglas:
     - 1 grupo + varias fechas  -> torta temporal del grupo
@@ -134,11 +148,15 @@ def crear_grafico_torta(df_plot, titulo, mostrar_value):
     - otro caso                -> warning
     """
 
+    fondos_config = kwargs.get("fondos_config", {})
+
     grupos = df_plot[COLUMNA_AGRUPADORA].unique()
     fechas = df_plot["fecha"].unique()
 
     cant_grupos = len(grupos)
     cant_fechas = len(fechas)
+
+    textinfo = "percent+label" + ("+value" if mostrar_valores == SI else "")
 
     # ----- Caso 1: UN grupo, VARIAS fechas -----
     if cant_grupos == 1 and cant_fechas > 1:
@@ -149,13 +167,13 @@ def crear_grafico_torta(df_plot, titulo, mostrar_value):
                 go.Pie(
                     labels=df_ord["fecha"].dt.strftime("%d-%m"),
                     values=df_ord["valor"],
-                    textinfo="percent+label" + ("+value" if mostrar_valores=="Sí" else "")
+                    textinfo=textinfo
                 )
             ]
         )
 
         fig.update_layout(
-            title=f"{titulo} – {grupos[0]}", # Aca se agrega el grupo agrupador ya sea grupo o fecha
+            title=f"{titulo} – {etiqueta_fondo(grupos[0], fondos_config[fondo]["divisor"])}",
             template="simple_white"
         )
 
@@ -163,12 +181,17 @@ def crear_grafico_torta(df_plot, titulo, mostrar_value):
 
     # ----- Caso 2: UNA fecha, VARIOS grupos -----
     elif cant_fechas == 1 and cant_grupos > 1:
+        labels = [
+            etiqueta_fondo(fondo, fondos_config[fondo]["divisor"])
+            for fondo in df_plot[COLUMNA_AGRUPADORA]
+        ]
+
         fig = go.Figure(
             data=[
                 go.Pie(
-                    labels=df_plot[COLUMNA_AGRUPADORA],
+                    labels=labels,
                     values=df_plot["valor"],
-                    textinfo="percent+label"
+                    textinfo=textinfo
                 )
             ]
         )
@@ -189,6 +212,12 @@ def crear_grafico_torta(df_plot, titulo, mostrar_value):
         )
         return None
 
+GRAFICOS = {
+    GRAF_LINEAS: crear_grafico_linea,
+    GRAF_BARRAS_GRUPO: crear_grafico_barra_por_grupo,
+    GRAF_BARRAS_EJE: crear_grafico_barra_por_eje,
+    GRAF_TORTA: crear_grafico_torta
+}
 
 if archivo is not None:
     # Leer excel
@@ -222,10 +251,10 @@ if archivo is not None:
         tipo_grafico = st.radio(
             "Tipo de gráfico",
             [
-                "Líneas",
-                "Barras",
-                "Barras (X = grupos)",
-                "Torta"
+                GRAF_LINEAS,
+                GRAF_BARRAS_EJE,
+                GRAF_BARRAS_GRUPO,
+                GRAF_TORTA
             ]
         )
         
@@ -241,7 +270,7 @@ if archivo is not None:
         # Mostrar valores
         mostrar_valores = st.radio(
             "Mostrar valores en el gráfico?",
-            ["No", "Sí"]
+            [NO, SI]
         )
         
         st.markdown("## Filtros")
@@ -284,6 +313,10 @@ if archivo is not None:
             c for c in columnas_fechas
             if fecha_inicio <= pd.to_datetime(c).date() <= fecha_fin
         ]
+        
+        if not fechas_filtradas:
+            st.warning("No hay fechas dentro del rango seleccionado")
+            st.stop()
 
         df_largo = df.melt(
             id_vars=COLUMNA_AGRUPADORA,
@@ -307,26 +340,14 @@ if archivo is not None:
             df_plot = pd.concat(filas)
 
             # 👇 ACA SE ELIGE QUÉ FUNCIÓN USAR
-            if tipo_grafico == "Líneas":
-                fig = crear_grafico_linea(
-                    df_plot, fondos_config, mostrar_valores,
-                    titulo_grafico, titulo_x, titulo_y
-                )
-
-            elif tipo_grafico == "Barras (X = grupos)":
-                fig = crear_grafico_barra_por_grupo(
-                    df_plot, fondos_config, mostrar_valores,
-                    titulo_grafico, titulo_x, titulo_y
-                )
-                
-            elif tipo_grafico == "Torta":
-                fig = crear_grafico_torta(df_plot, titulo_grafico, mostrar_valores)
-                
-            else:  # Barras
-                fig = crear_grafico_barra_por_eje(
-                    df_plot, fondos_config, mostrar_valores,
-                    titulo_grafico, titulo_x, titulo_y
-                )
+            fig = GRAFICOS[tipo_grafico](
+                df_plot=df_plot,
+                fondos_config=fondos_config,
+                mostrar_valores=mostrar_valores,
+                titulo=titulo_grafico,
+                titulo_x=titulo_x,
+                titulo_y=titulo_y
+            )
                 
             if fig is not None:
                 st.plotly_chart(fig, use_container_width=True)
