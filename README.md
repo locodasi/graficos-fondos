@@ -88,7 +88,6 @@ Para el uso de la aplicacion, la tabla a graficar debe tener la siguiente estruc
 - La primera columna debe ser la columna agrupadora
 - El resto de columnas seran los valores del eje X
 - Los valores a graficar deben ser numeros
-- Las columnas debe ser fechas (Por ahora)
 
 ### Ejemplo de tabla
 
@@ -125,7 +124,8 @@ Aca podras configurar ciertas cosas del grafico, como por ejemplo si queres que 
 
 ### Filtros
 
-Podras filtrar los datos para solo mostrar los datos de las fechas especificas, como de solo los grupos seleccionados.
+Ahora podras filtrar los datos para solo mostrar los que esten entre las fechas especificas (si las columnas son de tipo fecha) o entre las columnas establecidas (osea de la columna 1 a la 4, por ejemplo), ademas de eso luego podras seleccionar manualmente que columna de las seleccionadas realmente queres usar (Por ejemplo, queres las columnas de enero a marzo, pero solo te inetersa la del primero de enero, febrero y todo marzo, en ese caso filtras las fechas de los 3 meses y luego manualmente eliminas las fechas que no te interesan), aunque las columnas en la seleccion pueden estar desordenadas, en el grafico estaran en el mismo orden que el excel.
+
 Ademas en el caso de que los valores sean muy dispares, lo que no permitiria que el grafico muestre claramente las diferencias de valores, podras a cada grupo dividir sus valores para asi tener una menor disparidad y mejorar el grafico, no te preocupes que en el titulo del grupo aparecera por cuanto lo dividiste, si es que lo dividiste.
 
 ### Crear garfico
