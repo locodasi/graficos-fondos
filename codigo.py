@@ -39,7 +39,7 @@ if archivo is not None:
     es_fecha = columnas_son_fechas(columnas_x)
 
     # Formulario
-    with st.form("form_filtros"):
+    with st.container(border=True):
         
         st.markdown("## Tipo de grafico")
         
@@ -75,10 +75,26 @@ if archivo is not None:
         if es_fecha:
             fechas = pd.to_datetime(columnas_x)
 
-            fecha_inicio, fecha_fin = st.date_input(
+            rango_fechas = st.date_input(
                 "Seleccioná el rango de fechas",
                 value=(fechas.min(), fechas.max())
             )
+            
+            if not (isinstance(rango_fechas, tuple) and len(rango_fechas) == 2):
+                st.info("Seleccioná fecha de inicio y fin")
+                st.stop()
+            else:
+                fecha_inicio, fecha_fin = rango_fechas
+            
+                columnas_en_rango = [
+                    c for c in columnas_x
+                    if fecha_inicio <= pd.to_datetime(c).date() <= fecha_fin
+                ]
+
+                opciones = {
+                    pd.to_datetime(c).strftime("%d-%m-%Y"): c
+                    for c in columnas_en_rango
+                }
         else:
             col_a, col_b = st.columns(2)
 
@@ -99,6 +115,22 @@ if archivo is not None:
                     value=len(columnas_x),
                     step=1
                 )
+
+            columnas_en_rango = columnas_x[idx_inicio-1:idx_fin]
+            opciones = {c: c for c in columnas_en_rango}
+            
+        # -------- Multiselect REAL --------
+        labels_seleccionados = st.multiselect(
+            "Seleccioná las columnas a graficar",
+            options=list(opciones.keys()),
+            default=list(opciones.keys())
+        )
+
+        # Guardamos las columnas reales
+        columnas_seleccionadas = [
+            c for c in columnas_en_rango
+            if c in [opciones[l] for l in labels_seleccionados]
+        ]
         
         st.markdown("### Grupos y divisores")
 
@@ -124,24 +156,15 @@ if archivo is not None:
                 "divisor": divisor
             }
         
-        boton = st.form_submit_button("Crear gráfico")
+        # ⬇️ SOLO EL BOTÓN VA EN EL FORM
+        with st.form("form_graficar", border=False):
+            boton = st.form_submit_button("Crear gráfico")
 
     # Crear gráfico
     if boton:
-        if es_fecha:
-            columnas_seleccionadas = [
-                c for c in columnas_x
-                if fecha_inicio <= pd.to_datetime(c).date() <= fecha_fin
-            ]
-        else:
-            
-            if idx_fin < idx_inicio:
-                st.error("⚠️ El número final no puede ser menor que el inicial")
-                st.stop()
-            columnas_seleccionadas = columnas_x[idx_inicio-1 : idx_fin]
         
         if not columnas_seleccionadas:
-            st.warning("No hay columnas dentro del rango seleccionado")
+            st.warning("No seleccionaste ninguna columna")
             st.stop()
 
         df_largo = df.melt(
