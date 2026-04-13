@@ -1,199 +1,84 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+
+from config import *
+from utils import columnas_son_fechas
+from graficos import *
+from data import normalizar_df, obtener_columnas_x, preparar_df_plot
+from filters import filtros_columnas, filtros_fondos
 
 
-st.title("Evolución de fondos (diferencia vs base)")
+GRAFICOS = {
+    GRAF_LINEAS: crear_grafico_linea,
+    GRAF_BARRAS_GRUPO: crear_grafico_barra_por_grupo,
+    GRAF_BARRAS_EJE: crear_grafico_barra_por_eje,
+    GRAF_TORTA: crear_grafico_torta
+}
+
+st.title("Creador de gráficos")
 
 archivo = st.file_uploader("Cargá el archivo Excel", type=["xlsx", "xls"])
 
-def crear_grafico_linea(df_plot, fondos_config, mostrar_valores, titulo, titulo_x, titulo_y):
-    fig = go.Figure()
-    
-
-    for fondo in df_plot["fondos"].unique():
-        datos = df_plot[df_plot["fondos"] == fondo]
-        divisor = fondos_config[fondo]["divisor"]
-
-        if divisor == 1:
-            label = fondo
-        else:
-            label = f"{fondo} (÷ {divisor})"
-
-        fig.add_trace(
-            go.Scatter(
-                x=datos["fecha"],
-                y=datos["valor"],
-                mode="lines+markers+text" if mostrar_valores=="Sí" else "lines+markers",
-                name=label,
-                text=datos["valor"].round(2) if mostrar_valores=="Sí" else None,
-                textposition="top center"
-            )
-        )
-
-    fechas_unicas = df_plot["fecha"].sort_values().dt.strftime("%Y-%m-%d").unique()
-
-    fig.update_layout(
-        title=titulo,
-        template="simple_white",
-        xaxis_title=titulo_x,
-        yaxis_title=titulo_y,
-        xaxis=dict(
-            type="date",
-            tickvals=fechas_unicas,
-            ticktext=[pd.to_datetime(f).strftime("%d-%m") for f in fechas_unicas]
-        )
-    )
-
-    return fig
-
-def crear_grafico_barra(df_plot, fondos_config, mostrar_valores, titulo, titulo_x, titulo_y):
-    fig = go.Figure()
-
-    # Fechas únicas ordenadas
-    fechas = sorted(df_plot["fecha"].unique())
-
-    # Fondos (eje X) con divisor en el nombre si corresponde
-    fondos_labels = []
-    for fondo in df_plot["fondos"].unique():
-        divisor = fondos_config[fondo]["divisor"]
-        if divisor == 1:
-            fondos_labels.append(fondo)
-        else:
-            fondos_labels.append(f"{fondo} (÷ {divisor})")
-
-    # Crear una traza POR FECHA
-    for fecha in fechas:
-        datos_fecha = df_plot[df_plot["fecha"] == fecha]
-        y_vals = datos_fecha["valor"]
-        fig.add_trace(
-            go.Bar(
-                x=fondos_labels,
-                y=y_vals,
-                name=pd.to_datetime(fecha).strftime("%d-%m"),
-                text=y_vals.round(2) if mostrar_valores=="Sí" else None,
-                textposition="auto"
-            )
-        )
-
-    fig.update_layout(
-        title=titulo,
-        template="simple_white",
-        xaxis_title=titulo_x,
-        yaxis_title=titulo_y,
-        barmode="group"
-    )
-
-    return fig
-
-
 if archivo is not None:
-    # Leer excel
     df = pd.read_excel(archivo)
+    df = normalizar_df(df)
 
-    # Normalizar columnas
-    df.columns = (
-        df.columns
-        .astype(str)
-        .str.strip()
-        .str.lower()
-    )
+    columnas_x = obtener_columnas_x(df)
+    es_fecha = columnas_son_fechas(columnas_x)
 
-    columnas_fijas = ["fondos"]
-    columnas_fechas = [c for c in df.columns if c not in columnas_fijas]
+    with st.container(border=True):
 
-    # Convertir fechas
-    fechas = pd.to_datetime(columnas_fechas)
-
-    # Formulario
-    with st.form("form_filtros"):
-        st.subheader("Filtros")
-
-        # Rango de fechas
-        fecha_inicio, fecha_fin = st.date_input(
-            "Seleccioná el rango de fechas",
-            value=(fechas.min(), fechas.max())
-        )
+        st.markdown("## Tipo de gráfico")
         
-        # Títulos personalizados
-        titulo_grafico = st.text_input("Título del gráfico", value="Evolución de fondos")
-        titulo_x = st.text_input("Título eje X", value="Fecha")
-        titulo_y = st.text_input("Título eje Y", value="Diferencia (ajustada)")
-        
-        # Mostrar valores
-        mostrar_valores = st.radio(
-            "Mostrar valores en el gráfico?",
-            ["No", "Sí"]
-        )
-        
-        # 👇 RADIO BUTTON
         tipo_grafico = st.radio(
             "Tipo de gráfico",
-            ["Líneas", "Barras"]
+            list(GRAFICOS.keys())
         )
 
-        st.markdown("### Fondos y divisores")
+        st.markdown("## Configuración")
+        titulo = st.text_input("Título del gráfico", "Evolución de fondos")
+        titulo_x = st.text_input("Título eje X", "Fecha")
+        titulo_y = st.text_input("Título eje Y", "Valor")
 
-        fondos_config = {}
+        mostrar_valores = st.radio(
+            "Mostrar valores",
+            [NO, SI]
+        )
 
-        for fondo in df["fondos"].unique():
-            col1, col2, col3 = st.columns([2, 2, 2])
+        st.markdown("## Filtros")
+        columnas_seleccionadas = filtros_columnas(columnas_x, es_fecha)
 
-            with col1:
-                incluir = st.checkbox(f"Incluir {fondo}", value=True)
+        st.markdown("## Grupos y divisores")
+        fondos_config = filtros_fondos(df)
 
-            with col2:
-                divisor = st.number_input(
-                    f"Divisor {fondo}",
-                    min_value=0.0001,
-                    value=1.0,
-                    step=0.1,
-                    key=f"div_{fondo}"
-                )
+        with st.form("form_graficar", border=False):
+            boton = st.form_submit_button("Crear gráfico")
 
-            fondos_config[fondo] = {
-                "incluir": incluir,
-                "divisor": divisor
-            }
-
-        boton = st.form_submit_button("Crear gráfico")
-
-    # Crear gráfico
     if boton:
-        fechas_filtradas = [
-            c for c in columnas_fechas
-            if fecha_inicio <= pd.to_datetime(c).date() <= fecha_fin
-        ]
+        if not columnas_seleccionadas:
+            st.warning("No seleccionaste columnas")
+            st.stop()
 
-        df_largo = df.melt(
-            id_vars="fondos",
-            value_vars=fechas_filtradas,
-            var_name="fecha",
-            value_name="valor"
+        df_plot = preparar_df_plot(
+            df,
+            columnas_seleccionadas,
+            fondos_config,
+            es_fecha
         )
 
-        df_largo["fecha"] = pd.to_datetime(df_largo["fecha"])
+        if df_plot is None:
+            st.warning("No seleccionaste ningún fondo")
+            st.stop()
 
-        # Aplicar filtros y divisores
-        filas = []
+        fig = GRAFICOS[tipo_grafico](
+            df_plot=df_plot,
+            fondos_config=fondos_config,
+            mostrar_valores=mostrar_valores,
+            titulo=titulo,
+            titulo_x=titulo_x,
+            titulo_y=titulo_y,
+            es_fecha=es_fecha
+        )
 
-        for fondo, cfg in fondos_config.items():
-            if cfg["incluir"]:
-                temp = df_largo[df_largo["fondos"] == fondo].copy()
-                temp["valor"] = temp["valor"] / cfg["divisor"]
-                filas.append(temp)
-
-        if filas:
-            df_plot = pd.concat(filas)
-
-            # 👇 ACA SE ELIGE QUÉ FUNCIÓN USAR
-            if tipo_grafico == "Líneas":
-                fig = crear_grafico_linea(df_plot, fondos_config, mostrar_valores, titulo_grafico, titulo_x, titulo_y)
-            else:
-                fig = crear_grafico_barra(df_plot, fondos_config, mostrar_valores, titulo_grafico, titulo_x, titulo_y)
-                
-            st.session_state["fig"] = fig
+        if fig is not None:
             st.plotly_chart(fig, use_container_width=True)
-
-        else:
-            st.warning("No seleccionaste ningún fondo.")
