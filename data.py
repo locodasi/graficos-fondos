@@ -13,6 +13,12 @@ def normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
 
     primera_columna = df.columns[0]
     df = df.rename(columns={primera_columna: COLUMNA_AGRUPADORA})
+
+    # Cortar en la primera fila donde el nombre del fondo sea NaN
+    primer_nan = df[COLUMNA_AGRUPADORA].isna().idxmax()
+    if df[COLUMNA_AGRUPADORA].isna().any():
+        df = df.iloc[:primer_nan]
+        
     return df
 
 
